@@ -1,0 +1,8 @@
+site_name: Smoots
+site_url: https://smoots.dev/
+
+nav:
+  - index.md
+
+theme:
+  name: material

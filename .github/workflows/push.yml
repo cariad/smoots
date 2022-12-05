@@ -1,0 +1,44 @@
+name: push
+on:  # yamllint disable-line rule:truthy
+  push:
+    branches:
+      - "**"
+
+jobs:
+  validate-older:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        python-version:
+          # "3.8" is not supported
+          - "3.9"
+          - "3.10"
+
+    steps:
+      - uses: actions/checkout@v2.5.0
+
+      - uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - run: pip install pytest pytest-cov && pytest -vv
+
+  validate-current:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v2.5.0
+
+      - uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+
+      - name: Validate
+        run: >
+          pip install --upgrade --user -r requirements.dev.txt &&
+          ./validate.sh &&
+          coverage xml &&
+          ./build.sh ${{ github.ref_name }}
+
+      - uses: codecov/codecov-action@v3.1.1

@@ -1,0 +1,27 @@
+name: release
+on:  # yamllint disable-line rule:truthy
+  push:
+    tags:
+      - "**"
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2.5.0
+
+      - uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+
+      - name: Build
+        run: >
+          pip install --upgrade --user -r requirements.dev.txt &&
+          ./build.sh ${{ github.ref_name }} &&
+          mkdocs gh-deploy --force
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@v1.5.1
+        with:
+          password: ${{ secrets.PYPI_API_TOKEN }}

@@ -1,0 +1,12 @@
+black~=22.10
+flake8~=6.0
+isort~=5.10
+mkdocs~=1.4
+mkdocs-material~=8.5
+mypy~=0.991
+pip~=22.3
+pytest~=7.2
+pytest-cov~=4.0
+shellcheck-py~=0.8
+wheel~=0.38
+yamllint~=1.28
