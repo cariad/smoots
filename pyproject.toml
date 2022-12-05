@@ -1,0 +1,15 @@
+[tool.isort]
+line_length = 79
+profile = "black"
+
+[tool.pylint.messages_control]
+disable = """
+invalid-name,
+missing-function-docstring,
+missing-module-docstring,
+"""
+
+[tool.pytest.ini_options]
+addopts = "--cov=smoots --cov-branch --cov-report=html --cov-report=term-missing:skip-covered --cov-report=xml --no-cov-on-fail"
+log_cli = 1
+testpaths = "tests"

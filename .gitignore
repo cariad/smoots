@@ -1,0 +1,6 @@
+.coverage
+.mypy_cache
+__pycache__
+coverage.xml
+dist
+smoots.egg-info
