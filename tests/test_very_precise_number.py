@@ -178,19 +178,6 @@ def test_nth(number: int, index: int, expect: int) -> None:
     assert VeryPreciseNumber.nth(number, index) == expect
 
 
-# @mark.parametrize(
-#     "vpn, expect",
-#     [
-#         (VeryPreciseNumber(0, 0), "0.0"),
-#         (VeryPreciseNumber(1, 0), "1.0"),
-#         (VeryPreciseNumber(0, 1), "0.1"),
-#         # (VeryPreciseNumber(0, 1, shift), "0.01"),
-#     ],
-# )
-# def test_repr(vpn: VeryPreciseNumber, expect: str) -> None:
-#     assert repr(vpn) == expect
-
-
 @mark.parametrize(
     "vpn, expect",
     [
