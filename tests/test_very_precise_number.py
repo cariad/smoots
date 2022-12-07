@@ -2,7 +2,7 @@ from pytest import mark
 
 from smoots.very_precise_number import VeryPreciseNumber
 from csv import reader
-
+from smoots.log import log
 
 @mark.parametrize(
     "a, b, expect",
@@ -363,11 +363,13 @@ def test_truediv(
 
 
 def test_pi() -> None:
+    log.setLevel("INFO")
+
     with open("./tests/data/leibniz.csv", mode="r") as f:
         rows = reader(f)
         next(rows)
         for row in rows:
             iterations = int(row[0])
-            expect_vpn = VeryPreciseNumber.from_string(row[1])
+            expect = VeryPreciseNumber.from_string(row[1])
             actual = VeryPreciseNumber.pi(iterations)
-            assert actual == expect_vpn, f"at {iterations} iterations"
+            assert actual == expect, f"Expected {expect} but got {actual} at {iterations} iterations"

@@ -1,14 +1,19 @@
 from __future__ import annotations
-
+from logging import getLogger
 from math import modf
 from typing import Any, Dict, List, Optional
 from math import log10, floor, pow
 from smoots.log import log
 
+pi_log = getLogger("smoots.pi")
+
 
 class VeryPreciseNumber:
     def __init__(
-        self, significand: int, e: int = 0, repeating: Optional[int] = None
+        self,
+        significand: int,
+        e: int = 0,
+        repeating: Optional[int] = None,
     ) -> None:
         self._exponent = e
         self._significand = significand
@@ -26,17 +31,9 @@ class VeryPreciseNumber:
                 other.least_significant_exponent,
             )
 
-            log.debug(
-                "Add from exponent %s to %s",
-                most_significant_exponent,
-                least_significant_exponent,
-            )
-
             exponent_offset = (
                 0 - least_significant_exponent if least_significant_exponent < 0 else 0
             )
-
-            log.debug("Exponent offset is %s", exponent_offset)
 
             exponent = least_significant_exponent
             result = 0
@@ -48,24 +45,15 @@ class VeryPreciseNumber:
 
                 summed = self_value + other_value
 
-                log.debug(
-                    "At exponent %s, self %s + other %s == %s",
-                    exponent,
-                    self_value,
-                    other_value,
-                    summed,
-                )
-
                 result += summed * (10 ** (exponent + exponent_offset))
-                log.debug("Add to make result %s", result)
 
                 exponent += 1
                 if exponent > most_significant_exponent and carry == 0:
                     break
 
-            log.debug("%s + %s = significand %s", self, other, result)
-
-            return VeryPreciseNumber(result, e=-exponent_offset)
+            vpn = VeryPreciseNumber(result, e=-exponent_offset)
+            log.debug("%s + %s = %s", self, other, vpn)
+            return vpn
 
         raise TypeError(
             f"Cannot add {other} ({other.__class__.__name__}) to "
@@ -157,37 +145,15 @@ class VeryPreciseNumber:
                 self_value = self.at_exponent(exponent)
                 other_value = other.at_exponent(exponent)
 
-                log.debug(
-                    "e %s : will calculate %s - %s",
-                    exponent,
-                    self_value,
-                    other_value,
-                )
-
                 if ten_from_next:
                     if self_value > 0:
                         self_value -= 1
                         ten_from_next = False
-                        log.debug(
-                            "...but 10 has been borrowed, so calculating %s - %s and ending borrow chain",
-                            self_value,
-                            other_value,
-                        )
                     else:
                         self_value = 9
                         ten_from_next = True
-                        log.debug(
-                            "...but 10 has been borrowed and would put this 0 into debt, so calculating %s - %s and continuing the borrow chain",
-                            self_value,
-                            other_value,
-                        )
 
                 if self_value < other_value:
-                    log.debug(
-                        "%s < %s so borrowing 10",
-                        self_value,
-                        other_value,
-                    )
                     self_value += 10
                     ten_from_next = True
 
@@ -195,27 +161,13 @@ class VeryPreciseNumber:
 
                 result += subbed * (10 ** (exponent + exponent_offset))
 
-                log.debug(
-                    "%s - %s == %s : result so far = %s",
-                    self_value,
-                    other_value,
-                    subbed,
-                    result,
-                )
-
                 exponent += 1
                 if exponent > most_significant_exponent and not ten_from_next:
                     break
 
-            log.debug(
-                "%s - %s = significand %s, exponent %s",
-                self,
-                other,
-                result,
-                -exponent_offset,
-            )
-
-            return VeryPreciseNumber(result, e=-exponent_offset)
+            vpn = VeryPreciseNumber(result, e=-exponent_offset)
+            log.debug("%s - %s = %s", self, other, vpn)
+            return vpn
 
         raise TypeError(
             f"Cannot subtract {other} ({other.__class__.__name__}) from "
@@ -278,16 +230,11 @@ class VeryPreciseNumber:
 
                 result += this_result
 
-            log.debug(
-                "%s / %s = significand %s with exponent %s and repeating sequence %s",
-                self,
-                other,
-                result,
-                result_exponent,
-                repeating,
-            )
+            vpn = VeryPreciseNumber(result, e=result_exponent, repeating=repeating)
 
-            return VeryPreciseNumber(result, e=result_exponent, repeating=repeating)
+            log.debug("%s / %s = %s", self, other, vpn)
+
+            return vpn
 
         raise TypeError(
             f"Cannot divide {self.__class__.__name__} by {other} "
@@ -328,7 +275,6 @@ class VeryPreciseNumber:
             significand *= 10
             significand += int(char)
 
-
         log.debug(
             'Lazily converted "%s" to significand %s and exponent %s',
             s,
@@ -339,7 +285,11 @@ class VeryPreciseNumber:
         while significand > 0 and significand % 10 == 0:
             significand //= 10
             exponent += 1
-            log.debug("Collapsed to significand %s and exponent %s", significand, exponent,)
+            log.debug(
+                "Collapsed to significand %s and exponent %s",
+                significand,
+                exponent,
+            )
 
         log.debug(
             '"%s" converted to significand %s and exponent %s',
@@ -414,6 +364,7 @@ class VeryPreciseNumber:
             curr = VeryPreciseNumber(4) / denominator
             p = p + curr if i % 2 == 0 else p - curr
             denominator += 2
+            pi_log.debug("Pi estimation after %s iterations: %s", i, p)
 
         return p
 
@@ -517,22 +468,6 @@ class VeryPreciseNumber:
         log.debug("%s[%s] == %s", number, index, n)
         return n
 
-
-#     @classmethod
-#     def pi(cls, iterations: int = 1_000_000) -> VeryPreciseNumber:
-#         """
-#         Leibniz’s formula
-#         """
-
-#         denominator = 1
-#         p = VeryPreciseNumber(0, 0)
-
-#         for i in range(iterations):
-#             curr = VeryPreciseNumber(4, 0) / denominator
-#             p = p + curr if i % 2 == 0 else p - curr
-#             denominator += 2
-
-#         return p
 
 #     @classmethod
 #     def new(cls, value: float | int) -> VeryPreciseNumber:
