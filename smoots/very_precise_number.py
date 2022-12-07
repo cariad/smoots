@@ -7,11 +7,12 @@ from smoots.log import log
 
 
 class VeryPreciseNumber:
-    def __init__(self, significand: int, e: int = 0, repeating: Optional[int] = None) -> None:
+    def __init__(
+        self, significand: int, e: int = 0, repeating: Optional[int] = None
+    ) -> None:
         self._exponent = e
         self._significand = significand
         self._repeating = repeating
-
 
     def __add__(self, other: Any) -> VeryPreciseNumber:
         if isinstance(other, VeryPreciseNumber):
@@ -31,7 +32,9 @@ class VeryPreciseNumber:
                 least_significant_exponent,
             )
 
-            exponent_offset = 0 - least_significant_exponent if least_significant_exponent < 0 else 0
+            exponent_offset = (
+                0 - least_significant_exponent if least_significant_exponent < 0 else 0
+            )
 
             log.debug("Exponent offset is %s", exponent_offset)
 
@@ -45,9 +48,15 @@ class VeryPreciseNumber:
 
                 summed = self_value + other_value
 
-                log.debug("At exponent %s, self %s + other %s == %s", exponent, self_value, other_value, summed,)
+                log.debug(
+                    "At exponent %s, self %s + other %s == %s",
+                    exponent,
+                    self_value,
+                    other_value,
+                    summed,
+                )
 
-                result += summed * (10**(exponent + exponent_offset))
+                result += summed * (10 ** (exponent + exponent_offset))
                 log.debug("Add to make result %s", result)
 
                 exponent += 1
@@ -123,15 +132,102 @@ class VeryPreciseNumber:
 
         return f"{self.integral}.{padding}{fraction_str}"
 
+    def __sub__(self, other: Any) -> VeryPreciseNumber:
+        if isinstance(other, VeryPreciseNumber):
+            log.debug("Calculating %s - %s", self, other)
+            most_significant_exponent = max(
+                self.most_significant_exponent,
+                other.most_significant_exponent,
+            )
+
+            least_significant_exponent = min(
+                self.least_significant_exponent,
+                other.least_significant_exponent,
+            )
+
+            exponent_offset = (
+                0 - least_significant_exponent if least_significant_exponent < 0 else 0
+            )
+
+            exponent = least_significant_exponent
+            result = 0
+            ten_from_next = False
+
+            while True:
+                self_value = self.at_exponent(exponent)
+                other_value = other.at_exponent(exponent)
+
+                log.debug(
+                    "e %s : will calculate %s - %s",
+                    exponent,
+                    self_value,
+                    other_value,
+                )
+
+                if ten_from_next:
+                    if self_value > 0:
+                        self_value -= 1
+                        ten_from_next = False
+                        log.debug(
+                            "...but 10 has been borrowed, so calculating %s - %s and ending borrow chain",
+                            self_value,
+                            other_value,
+                        )
+                    else:
+                        self_value = 9
+                        ten_from_next = True
+                        log.debug(
+                            "...but 10 has been borrowed and would put this 0 into debt, so calculating %s - %s and continuing the borrow chain",
+                            self_value,
+                            other_value,
+                        )
+
+                if self_value < other_value:
+                    log.debug(
+                        "%s < %s so borrowing 10",
+                        self_value,
+                        other_value,
+                    )
+                    self_value += 10
+                    ten_from_next = True
+
+                subbed = self_value - other_value
+
+                result += subbed * (10 ** (exponent + exponent_offset))
+
+                log.debug(
+                    "%s - %s == %s : result so far = %s",
+                    self_value,
+                    other_value,
+                    subbed,
+                    result,
+                )
+
+                exponent += 1
+                if exponent > most_significant_exponent and not ten_from_next:
+                    break
+
+            log.debug(
+                "%s - %s = significand %s, exponent %s",
+                self,
+                other,
+                result,
+                -exponent_offset,
+            )
+
+            return VeryPreciseNumber(result, e=-exponent_offset)
+
+        raise TypeError(
+            f"Cannot subtract {other} ({other.__class__.__name__}) from "
+            f"{self.__class__.__name__}"
+        )
+
     def __truediv__(self, other: Any) -> VeryPreciseNumber:
         if isinstance(other, int):
             carry = 0
             exponent = self.most_significant_exponent
             result = 0
             result_exponent = self._exponent
-
-            # done[value][carry] = (previous value and carry and their result)
-            # done: Dict[int, Dict[int, tuple[int, int, int]]] = {}
 
             # value, carry and their result
             recursion_track: List[tuple[int, int, int]] = []
@@ -147,7 +243,6 @@ class VeryPreciseNumber:
                     mult = 10**exponent
 
                 this_result = (value // other) * mult
-                # result += this_result
 
                 carry = (value % other) * 10
                 exponent -= 1
@@ -159,13 +254,21 @@ class VeryPreciseNumber:
 
                     this_recursion_info = (value, carry, this_result)
 
-                    start_index = recursion_track.index(this_recursion_info) if this_recursion_info in recursion_track else None
+                    start_index = (
+                        recursion_track.index(this_recursion_info)
+                        if this_recursion_info in recursion_track
+                        else None
+                    )
 
                     if start_index is not None:
                         log.debug("Recursion detected at track index %s", start_index)
 
-                        for index in range(len(recursion_track) - 1, start_index - 1, -1):
-                            repeating = int(str(recursion_track[index][2]) + str(repeating or ""))
+                        for index in range(
+                            len(recursion_track) - 1, start_index - 1, -1
+                        ):
+                            repeating = int(
+                                str(recursion_track[index][2]) + str(repeating or "")
+                            )
 
                         break
 
@@ -174,7 +277,6 @@ class VeryPreciseNumber:
                     result_exponent -= 1
 
                 result += this_result
-
 
             log.debug(
                 "%s / %s = significand %s with exponent %s and repeating sequence %s",
@@ -206,6 +308,47 @@ class VeryPreciseNumber:
             return 0
 
         return int(self._significand // 10**index) % 10
+
+    @classmethod
+    def from_string(cls, s: str) -> VeryPreciseNumber:
+        # Be aware of CVE-2020-10735: https://github.com/python/cpython/issues/95778
+
+        s = s.strip()
+
+        exponent = 0
+
+        if "." in s:
+            exponent = s.index(".") - (len(s) - 1)
+
+        significand = 0
+
+        for char in s:
+            if char == ".":
+                continue
+            significand *= 10
+            significand += int(char)
+
+
+        log.debug(
+            'Lazily converted "%s" to significand %s and exponent %s',
+            s,
+            significand,
+            exponent,
+        )
+
+        while significand > 0 and significand % 10 == 0:
+            significand //= 10
+            exponent += 1
+            log.debug("Collapsed to significand %s and exponent %s", significand, exponent,)
+
+        log.debug(
+            '"%s" converted to significand %s and exponent %s',
+            s,
+            significand,
+            exponent,
+        )
+
+        return VeryPreciseNumber(significand, e=exponent)
 
     @property
     def integral(self) -> int:
@@ -245,13 +388,13 @@ class VeryPreciseNumber:
     def normal_fractional(self) -> tuple[int, int]:
         min_exponent = self.least_significant_exponent
         result = 0
-
         start_exponent = 0
 
         for exponent in range(-1, min_exponent - 1, -1):
+            result *= 10
             if v := self.at_exponent(exponent):
                 start_exponent = min(start_exponent, exponent)
-                result += v * (10**-exponent)
+                result += v
 
         while result > 0 and result % 10 == 0:
             result //= 10
@@ -277,7 +420,6 @@ class VeryPreciseNumber:
     @property
     def repeating(self) -> Optional[int]:
         return self._repeating
-
 
     @property
     def scale(self) -> VeryPreciseNumber:
