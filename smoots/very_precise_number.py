@@ -1,59 +1,74 @@
 from __future__ import annotations
-from logging import getLogger
-from math import modf
-from typing import Any, Dict, List, Optional
-from math import log10, floor, pow
-from smoots.log import log
 
-pi_log = getLogger("smoots.pi")
+from io import StringIO
+from time import perf_counter
+from typing import Any, List, Optional
+
+from smoots.log import log
 
 
 class VeryPreciseNumber:
-    def __init__(
-        self,
-        significand: int,
-        e: int = 0,
-        repeating: Optional[int] = None,
-    ) -> None:
-        self._exponent = e
-        self._significand = significand
-        self._repeating = repeating
+    def __init__(self, numerator: int, denominator: int = 1) -> None:
+        self._numerator = numerator
+        self._denominator = denominator
+
+        if self._denominator < 0:
+            self._denominator = abs(self._denominator)
+            self._numerator = self._numerator * -1
+
+    @staticmethod
+    def greatest_common_factor(a: int, b: int) -> int:
+        # Set up a division problem where a is larger than b.
+        biggest = max(a, b)
+        smallest = min(a, b)
+
+        if smallest in (0, biggest):
+            return smallest
+
+        while True:
+            remainder = biggest % smallest
+
+            if remainder == 0:
+                return smallest
+
+            biggest = smallest
+            smallest = remainder
+
+    @property
+    def reduced(self) -> VeryPreciseNumber:
+        gcf = self.greatest_common_factor(self.numerator, self.denominator)
+        if gcf in (0, 1):
+            return self
+        return VeryPreciseNumber(
+            self.numerator // gcf, self.denominator // gcf
+        )
+
+    @staticmethod
+    def same_denominator(
+        a: VeryPreciseNumber,
+        b: VeryPreciseNumber,
+    ) -> tuple[VeryPreciseNumber, VeryPreciseNumber]:
+        x = a
+        y = b
+
+        if a.denominator != b.denominator:
+            x = VeryPreciseNumber(
+                a.numerator * b.denominator,
+                a.denominator * b.denominator,
+            )
+            y = VeryPreciseNumber(
+                b.numerator * a.denominator,
+                b.denominator * a.denominator,
+            )
+
+        return x, y
 
     def __add__(self, other: Any) -> VeryPreciseNumber:
         if isinstance(other, VeryPreciseNumber):
-            most_significant_exponent = max(
-                self.most_significant_exponent,
-                other.most_significant_exponent,
-            )
-
-            least_significant_exponent = min(
-                self.least_significant_exponent,
-                other.least_significant_exponent,
-            )
-
-            exponent_offset = (
-                0 - least_significant_exponent if least_significant_exponent < 0 else 0
-            )
-
-            exponent = least_significant_exponent
-            result = 0
-            carry = 0
-
-            while True:
-                self_value = self.at_exponent(exponent)
-                other_value = other.at_exponent(exponent)
-
-                summed = self_value + other_value
-
-                result += summed * (10 ** (exponent + exponent_offset))
-
-                exponent += 1
-                if exponent > most_significant_exponent and carry == 0:
-                    break
-
-            vpn = VeryPreciseNumber(result, e=-exponent_offset)
-            log.debug("%s + %s = %s", self, other, vpn)
-            return vpn
+            a, b = self.same_denominator(self, other)
+            return VeryPreciseNumber(
+                a.numerator + b.numerator, a.denominator
+            ).reduced
 
         raise TypeError(
             f"Cannot add {other} ({other.__class__.__name__}) to "
@@ -62,45 +77,13 @@ class VeryPreciseNumber:
 
     def __eq__(self, other: Any) -> bool:
         if isinstance(other, VeryPreciseNumber):
-            self_integral = self.integral
-            other_integral = other.integral
+            if self.numerator == 0 and other.numerator == 0:
+                return True
 
-            if self_integral != other_integral:
-                log.debug(
-                    "This integral %s != other %s",
-                    self_integral,
-                    other_integral,
-                )
-                return False
-
-            if self.repeating != other.repeating:
-                log.debug(
-                    "This number's repeating sequence %s != other's %s",
-                    self.repeating,
-                    other.repeating,
-                )
-                return False
-
-            self_fractional = self.normal_fractional
-            other_fractional = other.normal_fractional
-
-            if self_fractional[0] != other_fractional[0]:
-                log.debug(
-                    "This fractional significand %s != other %s",
-                    self_fractional[0],
-                    other_fractional[0],
-                )
-                return False
-
-            if self_fractional[1] != other_fractional[1]:
-                log.debug(
-                    "This fractional exponent %s != other %s",
-                    self_fractional[1],
-                    other_fractional[1],
-                )
-                return False
-
-            return True
+            return (
+                self.numerator == other.numerator
+                and self.denominator == other.denominator
+            )
 
         log.warning(
             "Cannot compare %s (%s) to %s",
@@ -111,251 +94,174 @@ class VeryPreciseNumber:
 
         return False
 
-    def __repr__(self) -> str:
-        f, e = self.normal_fractional
-        e = abs(e)
-
-        fraction_str = str(f)
-        padding = "0" * (e - len(fraction_str))
-
-        return f"{self.integral}.{padding}{fraction_str}"
-
-    def __sub__(self, other: Any) -> VeryPreciseNumber:
+    def __gt__(self, other: Any) -> bool:
         if isinstance(other, VeryPreciseNumber):
-            log.debug("Calculating %s - %s", self, other)
-            most_significant_exponent = max(
-                self.most_significant_exponent,
-                other.most_significant_exponent,
-            )
-
-            least_significant_exponent = min(
-                self.least_significant_exponent,
-                other.least_significant_exponent,
-            )
-
-            exponent_offset = (
-                0 - least_significant_exponent if least_significant_exponent < 0 else 0
-            )
-
-            exponent = least_significant_exponent
-            result = 0
-            ten_from_next = False
-
-            while True:
-                self_value = self.at_exponent(exponent)
-                other_value = other.at_exponent(exponent)
-
-                if ten_from_next:
-                    if self_value > 0:
-                        self_value -= 1
-                        ten_from_next = False
-                    else:
-                        self_value = 9
-                        ten_from_next = True
-
-                if self_value < other_value:
-                    self_value += 10
-                    ten_from_next = True
-
-                subbed = self_value - other_value
-
-                result += subbed * (10 ** (exponent + exponent_offset))
-
-                exponent += 1
-                if exponent > most_significant_exponent and not ten_from_next:
-                    break
-
-            vpn = VeryPreciseNumber(result, e=-exponent_offset)
-            log.debug("%s - %s = %s", self, other, vpn)
-            return vpn
+            a, b = self.same_denominator(self, other)
+            return a.numerator > b.numerator
 
         raise TypeError(
-            f"Cannot subtract {other} ({other.__class__.__name__}) from "
-            f"{self.__class__.__name__}"
-        )
-
-    def __truediv__(self, other: Any) -> VeryPreciseNumber:
-        if isinstance(other, int):
-            carry = 0
-            exponent = self.most_significant_exponent
-            result = 0
-            result_exponent = self._exponent
-
-            # value, carry and their result
-            recursion_track: List[tuple[int, int, int]] = []
-            repeating: Optional[int] = None
-
-            while True:
-                value = carry + self.at_exponent(exponent)
-
-                if exponent < 0:
-                    mult = 1
-                    result *= 10
-                else:
-                    mult = 10**exponent
-
-                this_result = (value // other) * mult
-
-                carry = (value % other) * 10
-                exponent -= 1
-
-                if exponent < self._exponent:
-                    if carry == 0:
-                        result += this_result
-                        break
-
-                    this_recursion_info = (value, carry, this_result)
-
-                    start_index = (
-                        recursion_track.index(this_recursion_info)
-                        if this_recursion_info in recursion_track
-                        else None
-                    )
-
-                    if start_index is not None:
-                        log.debug("Recursion detected at track index %s", start_index)
-
-                        for index in range(
-                            len(recursion_track) - 1, start_index - 1, -1
-                        ):
-                            repeating = int(
-                                str(recursion_track[index][2]) + str(repeating or "")
-                            )
-
-                        break
-
-                    recursion_track.append(this_recursion_info)
-
-                    result_exponent -= 1
-
-                result += this_result
-
-            vpn = VeryPreciseNumber(result, e=result_exponent, repeating=repeating)
-
-            log.debug("%s / %s = %s", self, other, vpn)
-
-            return vpn
-
-        raise TypeError(
-            f"Cannot divide {self.__class__.__name__} by {other} "
+            f"Cannot check {self.__class__.__name__} > {other} "
             f"({other.__class__.__name__})"
         )
 
-    def at_exponent(self, exponent: int) -> int:
-        """
-        Gets the value at `exponent`.
+    def __mul__(self, other: Any) -> VeryPreciseNumber:
+        if isinstance(other, VeryPreciseNumber):
+            result = VeryPreciseNumber(
+                self.numerator * other.numerator,
+                self.denominator * other.denominator,
+            ).reduced
+            # log.debug("%s * %s = %s", self, other, result)
+            return result
 
-        For example, the value at exponent 3 of 12345 is 2 because
-        2,000 == 2 * 10**3.
-        """
+        raise TypeError(
+            f"Cannot multiply {self.__class__.__name__} by {other} "
+            f"({other.__class__.__name__})"
+        )
 
-        index = exponent - self._exponent
+    def __repr__(self) -> str:
+        return f"{self._numerator}/{self._denominator}"
 
-        if index < 0:
-            return 0
+    def __sub__(self, other: Any) -> VeryPreciseNumber:
+        if isinstance(other, VeryPreciseNumber):
+            other = VeryPreciseNumber(other.numerator * -1, other.denominator)
+            return self + other
 
-        return int(self._significand // 10**index) % 10
+        raise TypeError(
+            f"Cannot add {other} ({other.__class__.__name__}) to "
+            f"{self.__class__.__name__}"
+        )
+
+    @property
+    def reciprocal(self) -> VeryPreciseNumber:
+        return VeryPreciseNumber(self.denominator, self.numerator)
+
+    def __truediv__(self, other: Any) -> VeryPreciseNumber:
+        if isinstance(other, VeryPreciseNumber):
+            return self * other.reciprocal
+
+        if isinstance(other, int):
+            return self * VeryPreciseNumber(1, other)
+
+        raise TypeError(
+            f"Cannot divide (true) {self.__class__.__name__} by {other} "
+            f"({other.__class__.__name__})"
+        )
+
+    def decimal(self, decimals: int = 100, recursion: bool = True) -> str:
+        result = StringIO()
+
+        integral = self._numerator // self._denominator
+
+        # Be aware of CVE-2020-10735:
+        # https://github.com/python/cpython/issues/95778
+
+        integral_length = self.length(integral)
+
+        if integral_length == 0:
+            result.write("0")
+        else:
+            for e in range(integral_length - 1, -1, -1):
+                result.write(str(self.at_exponent(integral, e)))
+
+        result.write(".")
+
+        remainder = (self._numerator % self._denominator) * 10
+
+        recursion_track: Optional[List[int]] = [] if recursion else None
+
+        fractional = 0
+        recurring_count = 0
+        decimal_places = 0
+
+        while True:
+            i = remainder // self._denominator
+            remainder = (remainder % self._denominator) * 10
+
+            if recursion_track is not None and (remainder in recursion_track):
+                recurring_count = len(recursion_track) - recursion_track.index(
+                    remainder
+                )
+                break
+
+            fractional *= 10
+            fractional += i
+            decimal_places += 1
+
+            if remainder == 0 or decimal_places >= decimals:
+                break
+
+            if recursion_track is not None:
+                recursion_track.append(remainder)
+
+        fractional_length = self.length(fractional)
+
+        if fractional_length == 0:
+            result.write("0")
+        else:
+            for index, e in enumerate(range(fractional_length - 1, -1, -1)):
+                if index >= fractional_length - recurring_count:
+                    result.write("\u0305")
+                result.write(str(self.at_exponent(fractional, e)))
+
+        return result.getvalue()
+
+    @property
+    def denominator(self) -> int:
+        return self._denominator
+
+    @property
+    def numerator(self) -> int:
+        return self._numerator
+
+    @staticmethod
+    def at_exponent(number: int, exponent: int) -> int:
+        return int(number // 10**exponent) % 10
+
+    @staticmethod
+    def string_to_int(s: str) -> int:
+        result = 0
+        for index, digit in enumerate(s):
+            e = len(s) - (index + 1)
+            result += int(digit) * (10**e)
+        return result
 
     @classmethod
     def from_string(cls, s: str) -> VeryPreciseNumber:
-        # Be aware of CVE-2020-10735: https://github.com/python/cpython/issues/95778
+        # Be aware of CVE-2020-10735:
+        # https://github.com/python/cpython/issues/95778
 
         s = s.strip()
 
-        exponent = 0
+        if "/" in s:
+            index = s.index("/")
+            return VeryPreciseNumber(
+                VeryPreciseNumber.string_to_int(s[:index]),
+                VeryPreciseNumber.string_to_int(s[index + 1 :]),  # noqa: E203
+            )
 
-        if "." in s:
-            exponent = s.index(".") - (len(s) - 1)
-
-        significand = 0
+        numerator = 0
+        denominator = 1
+        is_fraction = False
 
         for char in s:
             if char == ".":
+                is_fraction = True
                 continue
-            significand *= 10
-            significand += int(char)
 
-        log.debug(
-            'Lazily converted "%s" to significand %s and exponent %s',
-            s,
-            significand,
-            exponent,
-        )
+            numerator *= 10
+            numerator += int(char)
+            if is_fraction:
+                denominator *= 10
 
-        while significand > 0 and significand % 10 == 0:
-            significand //= 10
-            exponent += 1
-            log.debug(
-                "Collapsed to significand %s and exponent %s",
-                significand,
-                exponent,
-            )
-
-        log.debug(
-            '"%s" converted to significand %s and exponent %s',
-            s,
-            significand,
-            exponent,
-        )
-
-        return VeryPreciseNumber(significand, e=exponent)
-
-    @property
-    def integral(self) -> int:
-        max_exponent = self.most_significant_exponent
-        result = 0
-
-        for exponent in range(max_exponent + 1):
-            result += self.at_exponent(exponent) * (10**exponent)
-
-        return result
-
-    @property
-    def least_significant_exponent(self) -> int:
-        """
-        Gets the most least exponent of the number.
-        """
-
-        return self._exponent
-
-    @property
-    def most_significant_exponent(self) -> int:
-        """
-        Gets the most significant exponent of the number.
-
-        For example, the most significant exponent of "32" is "1" because
-        30 == 10**1.
-        """
-
-        significand_length = self.length(self._significand)
-
-        if significand_length == 0:
-            return 0
-
-        return significand_length + self._exponent - 1
-
-    @property
-    def normal_fractional(self) -> tuple[int, int]:
-        min_exponent = self.least_significant_exponent
-        result = 0
-        start_exponent = 0
-
-        for exponent in range(-1, min_exponent - 1, -1):
-            result *= 10
-            if v := self.at_exponent(exponent):
-                start_exponent = min(start_exponent, exponent)
-                result += v
-
-        while result > 0 and result % 10 == 0:
-            result //= 10
-
-        return result, start_exponent
+        return VeryPreciseNumber(numerator, denominator).reduced
 
     @staticmethod
-    def pi(iterations: int = 1_000_000) -> VeryPreciseNumber:
+    def pi(iterations: int = 2000) -> VeryPreciseNumber:
         """
         Leibniz's formula
         """
+
+        start = perf_counter()
 
         denominator = 1
         p = VeryPreciseNumber(0)
@@ -364,84 +270,11 @@ class VeryPreciseNumber:
             curr = VeryPreciseNumber(4) / denominator
             p = p + curr if i % 2 == 0 else p - curr
             denominator += 2
-            pi_log.debug("Pi estimation after %s iterations: %s", i, p)
+
+        end = perf_counter()
+        log.debug("%s iterations took %s seconds", iterations, end - start)
 
         return p
-
-    @property
-    def repeating(self) -> Optional[int]:
-        return self._repeating
-
-    @property
-    def scale(self) -> VeryPreciseNumber:
-        if self._exponent == 0:
-            return VeryPreciseNumber(self._exponent)
-
-        if self._exponent > 0:
-            s = int(pow(10, self._exponent))
-            return VeryPreciseNumber(s)
-
-        raise NotImplementedError()
-
-    # class VeryPreciseNumber:
-    #     def __init__(self, integral: int, fractional: int, shift: int = 0) -> None:
-    #         self._integral = integral
-    #         self._fractional = fractional
-
-    #     @staticmethod
-    #     def reverse(number: int) -> int:
-    #         number_len = VeryPreciseNumber.length(number)
-    #         result = 0
-    #         for index in range(number_len):
-    #             power = number_len - index - 1
-    #             src = VeryPreciseNumber.nth(number, index)
-
-    #             result += (src * (10**power))
-
-    #         return result
-
-    #     def __eq__(self, other: Any) -> bool:
-    #         if isinstance(other, VeryPreciseNumber):
-    #             return self.integral == other._integral and self._fractional == other._fractional
-
-    #         log.warning(
-    #             "Cannot compare %s (%s) to %s",
-    #             other, other.__class__.__name__, self.__class__.__name__,
-    #         )
-
-    #         return False
-
-    #     def __repr__(self) -> str:
-    #         return f"{self._integral}.{self._fractional}"
-
-    #     # @staticmethod
-    #     # def divide(dividend: int, divisor: int, carry: int = 0, no_remainder: bool = False) -> tuple[int, int]:
-    #     #     """
-    #     #     Returns the integer result of the division and the remainder.
-    #     #     """
-
-    #     #     dividend_length = VeryPreciseNumber.length(dividend)
-    #     #     result = 0
-    #     #     remainder = carry
-
-    #     #     power = 0
-
-    #     #     while True:
-
-    #     #     # for power in range(0, dividend_length):
-    #     #         n = (remainder * 10) + VeryPreciseNumber.nth(dividend, power)
-
-    #     #         tenth = (10 ** -power) if no_remainder else (10 ** power)
-    #     #         result += (n // divisor) * tenth
-    #     #         remainder = n % divisor
-
-    #     #         power += 1
-
-    #     #         if power >= dividend_length and ((not no_remainder) or (remainder == 0)):
-    #     #             break
-
-    #     #     log.debug("%s r %s / %s = %s r %s", dividend, carry, divisor, result, remainder)
-    #     #     return result, remainder
 
     @staticmethod
     def length(number: int) -> int:
@@ -451,37 +284,3 @@ class VeryPreciseNumber:
             number //= 10
 
         return count
-
-    #     @staticmethod
-    #     def length(number: int) -> int:
-    #         return floor(log10(number) + 1) if number else 0
-
-    #     @staticmethod
-    #     def nth(number: int, index: int) -> int:
-    #         n = int(number / (10 ** (index - 0)) % 10)
-    #         log.debug("%s[%s] == %s", number, index, n)
-    #         return n
-
-    @staticmethod
-    def nth(number: int, index: int) -> int:
-        n = number // (10 ** (index - 0)) % 10
-        log.debug("%s[%s] == %s", number, index, n)
-        return n
-
-
-#     @classmethod
-#     def new(cls, value: float | int) -> VeryPreciseNumber:
-#         if isinstance(value, int):
-#             return VeryPreciseNumber(value, 0)
-
-#         f, i = modf(value)
-#         fraction_len = len(str(f)) - 2
-#         return VeryPreciseNumber(int(i), int(f * (10**fraction_len)))
-
-#     @property
-#     def integral(self) -> int:
-#         return self._integral
-
-#     @property
-#     def fractional(self) -> VeryPreciseNumber:
-#         return VeryPreciseNumber(0, self._fractional)
