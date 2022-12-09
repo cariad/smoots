@@ -3,7 +3,7 @@ from __future__ import annotations
 from io import StringIO
 from time import perf_counter
 from typing import Any, List, Optional
-
+from math import modf
 from smoots.log import log
 
 
@@ -15,6 +15,15 @@ class VeryPreciseNumber:
         if self._denominator < 0:
             self._denominator = abs(self._denominator)
             self._numerator = self._numerator * -1
+
+    @property
+    def integral(self) -> int:
+        return self._numerator // self._denominator
+
+    @property
+    def fractional(self) -> VeryPreciseNumber:
+        return VeryPreciseNumber(self._numerator % self._denominator, self._denominator)
+
 
     @staticmethod
     def greatest_common_factor(a: int, b: int) -> int:
@@ -105,13 +114,17 @@ class VeryPreciseNumber:
         )
 
     def __mul__(self, other: Any) -> VeryPreciseNumber:
+        if isinstance(other, int):
+            other = VeryPreciseNumber(other)
+
+        if isinstance(other, float):
+            other = VeryPreciseNumber.from_float(other)
+
         if isinstance(other, VeryPreciseNumber):
-            result = VeryPreciseNumber(
+            return VeryPreciseNumber(
                 self.numerator * other.numerator,
                 self.denominator * other.denominator,
             ).reduced
-            # log.debug("%s * %s = %s", self, other, result)
-            return result
 
         raise TypeError(
             f"Cannot multiply {self.__class__.__name__} by {other} "
@@ -254,6 +267,25 @@ class VeryPreciseNumber:
                 denominator *= 10
 
         return VeryPreciseNumber(numerator, denominator).reduced
+
+    @classmethod
+    def from_float(cls, f: float) -> VeryPreciseNumber:
+        fractional, integral = modf(f)
+
+        result = VeryPreciseNumber(int(integral))
+        fractional = abs(fractional)
+
+        over = 10
+
+        while True:
+            fractional, integral = modf(fractional * 10)
+            result += VeryPreciseNumber(int(integral), over)
+            if fractional == 0:
+                break
+            over *= 10
+
+        return result
+
 
     @staticmethod
     def pi(iterations: int = 2000) -> VeryPreciseNumber:
