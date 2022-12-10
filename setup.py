@@ -47,10 +47,12 @@ setup(
     packages=[
         "smoots",
         "smoots.imperial",
+        "smoots.metric",
     ],
     package_data={
         "smoots": ["py.typed"],
         "smoots.imperial": ["py.typed"],
+        "smoots.metric": ["py.typed"],
     },
     project_urls={
         "Documentation": "https://smoots.dev",
