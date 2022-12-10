@@ -37,6 +37,9 @@ setup(
     classifiers=classifiers,
     description="Units of length",
     include_package_data=True,
+    install_requires=[
+        "vinculum==1.0.0b4",
+    ],
     license="MIT",
     long_description=long_description,
     long_description_content_type="text/markdown",
