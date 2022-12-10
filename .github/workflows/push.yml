@@ -22,7 +22,10 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
-      - run: pip install pytest pytest-cov && pytest -vv
+      - run: >
+          pip install --upgrade --user -r requirements.txt &&
+          pip install pytest pytest-cov &&
+          pytest -vv
 
   validate-current:
     runs-on: ubuntu-latest

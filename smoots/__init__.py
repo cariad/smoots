@@ -6,6 +6,10 @@ For usage and support, see https://github.com/cariad/smoots.
 
 from importlib.resources import files
 
+from smoots.imperial import Feet, Imperial, Inches, Miles, Yards
+from smoots.length import Length
+from smoots.metric import Centimetres, Metres, Metric
+
 
 def version() -> str:
     """
@@ -17,5 +21,14 @@ def version() -> str:
 
 
 __all__ = [
+    "Centimetres",
+    "Feet",
+    "Imperial",
+    "Inches",
+    "Length",
+    "Metres",
+    "Metric",
+    "Miles",
+    "Yards",
     "version",
 ]
