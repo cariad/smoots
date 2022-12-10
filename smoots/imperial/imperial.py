@@ -26,7 +26,7 @@ class Imperial(Length):
         Integral inches in this length.
         """
 
-        return self.integral(InchUnit)
+        return self.get_integral(InchUnit)
 
     @property
     def feet(self) -> int:
@@ -34,7 +34,7 @@ class Imperial(Length):
         Integral feet in this length.
         """
 
-        return self.integral(FootUnit)
+        return self.get_integral(FootUnit)
 
     @property
     def yards(self) -> int:
@@ -42,7 +42,7 @@ class Imperial(Length):
         Integral yards in this length.
         """
 
-        return self.integral(YardUnit)
+        return self.get_integral(YardUnit)
 
     @property
     def miles(self) -> int:
@@ -50,7 +50,7 @@ class Imperial(Length):
         Integral miles in this length.
         """
 
-        return self.integral(MileUnit)
+        return self.get_integral(MileUnit)
 
     @property
     def to_feet(self) -> Fraction:

@@ -24,7 +24,7 @@ class Metric(Length):
         Integral centimetres in this length.
         """
 
-        return self.integral(CentimetreUnit)
+        return self.get_integral(CentimetreUnit)
 
     @property
     def metres(self) -> int:
@@ -32,4 +32,4 @@ class Metric(Length):
         Integral metres in this length.
         """
 
-        return self.integral(MetreUnit)
+        return self.get_integral(MetreUnit)
