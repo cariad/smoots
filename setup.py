@@ -38,7 +38,7 @@ setup(
     description="Units of length",
     include_package_data=True,
     install_requires=[
-        "vinculum==1.0.0b4",
+        "vinculum==1.0.0b5",
     ],
     license="MIT",
     long_description=long_description,
@@ -46,13 +46,11 @@ setup(
     name="smoots",
     packages=[
         "smoots",
-        "smoots.imperial",
-        "smoots.metric",
+        "smoots.lengths",
     ],
     package_data={
         "smoots": ["py.typed"],
-        "smoots.imperial": ["py.typed"],
-        "smoots.metric": ["py.typed"],
+        "smoots.lengths": ["py.typed"],
     },
     project_urls={
         "Documentation": "https://smoots.dev",
