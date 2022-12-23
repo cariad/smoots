@@ -38,7 +38,8 @@ setup(
     description="Units of length",
     include_package_data=True,
     install_requires=[
-        "vinculum==1.0.0b5",
+        "bounden==1.0.0b21",
+        "vinculum==1.0.0b6",
     ],
     license="MIT",
     long_description=long_description,

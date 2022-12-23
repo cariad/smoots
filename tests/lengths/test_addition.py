@@ -1,5 +1,5 @@
 from pytest import raises
-from vinculum import Fraction
+from vinculum import Rational
 
 from smoots import Feet, Inches
 
@@ -15,7 +15,7 @@ def test_float() -> None:
 
 
 def test_fraction() -> None:
-    length = Feet(5) + Fraction(9, 4)
+    length = Feet(5) + Rational(9, 4)
     assert length == Feet(7) + Inches(3)
 
 

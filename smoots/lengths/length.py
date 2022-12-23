@@ -4,7 +4,7 @@ from abc import ABC, abstractmethod
 from logging import DEBUG
 from typing import Any, Dict, Type, TypeVar
 
-from vinculum import Fraction
+from vinculum import Rational
 
 from smoots.log import log
 
@@ -14,13 +14,13 @@ class Length(ABC):
     Length.
     """
 
-    def __init__(self, length: float | Fraction | int) -> None:
+    def __init__(self, length: float | int | Rational) -> None:
         # "length" is in the derived class' units (i.e. inches, lightyears,
         # etc) but we always record metres internally.
         self._total_metres = length * self.metres_per_unit()
 
     def __add__(self: LengthT, other: Any) -> LengthT:
-        if isinstance(other, (float, Fraction, int)):
+        if isinstance(other, (float, int, Rational)):
             other = self.__class__(other)
 
         if isinstance(other, Length):
@@ -89,7 +89,7 @@ class Length(ABC):
     @classmethod
     def from_metres(
         cls: Type[LengthT],
-        metres: float | Fraction | int,
+        metres: float | int | Rational,
     ) -> LengthT:
         """
         Creates a new instance of this length `metres` long.
@@ -103,7 +103,7 @@ class Length(ABC):
                 "Creating a new %s with unit length %s (%s m)",
                 cls.__name__,
                 unit_length.decimal(),
-                metres.decimal() if isinstance(metres, Fraction) else metres,
+                metres.decimal() if isinstance(metres, Rational) else metres,
             )
 
         return cls(unit_length)
@@ -117,7 +117,7 @@ class Length(ABC):
         return self.length.integral
 
     @property
-    def length(self) -> Fraction:
+    def length(self) -> Rational:
         """
         Gets the length of this length.
         """
@@ -126,7 +126,7 @@ class Length(ABC):
 
     @classmethod
     @abstractmethod
-    def metres_per_unit(cls) -> Fraction:
+    def metres_per_unit(cls) -> Rational:
         """
         Gets the number of metres per unit length.
         """

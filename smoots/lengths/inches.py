@@ -1,4 +1,4 @@
-from vinculum import Fraction
+from vinculum import Rational
 
 from smoots.lengths.feet import Feet
 from smoots.lengths.length import Length
@@ -10,7 +10,7 @@ class Inches(Length):
     """
 
     @classmethod
-    def metres_per_unit(cls) -> Fraction:
+    def metres_per_unit(cls) -> Rational:
         """
         Gets the number of metres per inch.
         """

@@ -1,4 +1,4 @@
-from vinculum import Fraction
+from vinculum import Rational
 
 from smoots.lengths.length import Length
 
@@ -9,7 +9,7 @@ class Yards(Length):
     """
 
     @classmethod
-    def metres_per_unit(cls) -> Fraction:
+    def metres_per_unit(cls) -> Rational:
         """
         Gets the number of metres per yard.
 
@@ -19,4 +19,4 @@ class Yards(Length):
         https://usma.org/laws-and-bills/refinement-of-values-for-the-yard-and-the-pound
         """
 
-        return Fraction(9_144, 10_000)
+        return Rational(9_144, 10_000)

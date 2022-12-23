@@ -1,4 +1,4 @@
-from vinculum import Fraction
+from vinculum import Rational
 
 from smoots.lengths.length import Length
 
@@ -9,9 +9,9 @@ class Centimetres(Length):
     """
 
     @classmethod
-    def metres_per_unit(cls) -> Fraction:
+    def metres_per_unit(cls) -> Rational:
         """
         Gets the number of metres per centimetre.
         """
 
-        return Fraction(1, 100)
+        return Rational(1, 100)
